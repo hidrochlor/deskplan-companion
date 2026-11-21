@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><rect width="1024" height="1024" fill="#121319"/><g transform="translate(512 512) scale(1.08) translate(-512 -555)">
+  <defs><linearGradient id="cone" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7c8cff" stop-opacity=".45"/><stop offset="1" stop-color="#7c8cff" stop-opacity=".04"/></linearGradient></defs>
+  <path d="M540 437 L700 403 L800 744 L440 744 Z" fill="url(#cone)"/>
+  <path d="M232 760 H452" stroke="#e6e8ef" stroke-width="40" stroke-linecap="round"/>
+  <path d="M452 760 H792" stroke="#7c8cff" stroke-width="40" stroke-linecap="round"/>
+  <path d="M268 746 a76 34 0 0 1 152 0 z" fill="#e6e8ef"/>
+  <path d="M344 724 L420 470 L612 356" fill="none" stroke="#e6e8ef" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="420" cy="470" r="22" fill="#121319" stroke="#e6e8ef" stroke-width="16"/>
+  <path d="M-82 0 A82 82 0 0 1 82 0 Z" fill="#e6e8ef" stroke="#e6e8ef" stroke-width="12" stroke-linejoin="round" transform="translate(620 420) rotate(-12)"/>
+  <circle cx="622" cy="432" r="18" fill="#4cc9a4"/></g></svg>

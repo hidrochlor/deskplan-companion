@@ -1,0 +1,140 @@
+{
+ "stundenplan-sample.ics": {
+  "name": "Met26",
+  "kind": "timetable",
+  "events": [
+   {
+    "uid": "MET2026_1021327",
+    "start": "2026-09-30T06:45:00.000Z",
+    "end": "2026-09-30T09:15:00.000Z",
+    "type": "lecture",
+    "title": "Strategic Management - Cases in International Business (Success and Pitfall Studies)",
+    "course": "Strategic Management - Cases in International Business (Success and Pitfall Studies)",
+    "context": "IL · WS46a.02.212 · Kuchler Karin"
+   },
+   {
+    "uid": "MET2026_1042925",
+    "start": "2026-10-05T08:45:00.000Z",
+    "end": "2026-10-05T11:15:00.000Z",
+    "type": "lecture",
+    "title": "Storage and Power-to-X Technologies",
+    "course": "Storage and Power-to-X Technologies",
+    "context": "VO · Online · Sumereder Christof"
+   },
+   {
+    "uid": "MET2026_1032372",
+    "start": "2026-10-22T09:15:00.000Z",
+    "end": "2026-10-22T11:45:00.000Z",
+    "type": "lecture",
+    "title": "Environmental Process Engineering",
+    "course": "Environmental Process Engineering",
+    "context": "VO · Asynchron · Fluch Jürgen"
+   },
+   {
+    "uid": "MET2026_1070879",
+    "start": "2027-01-12T13:00:00.000Z",
+    "end": "2027-01-12T15:15:00.000Z",
+    "type": "lecture",
+    "title": "Energy Networks and Hybrid Technologies",
+    "course": "Energy Networks and Hybrid Technologies",
+    "context": "IL · WS46a.02.210 · Sumereder Christof / Fluch Jürgen"
+   },
+   {
+    "uid": "MET2026_1031549",
+    "start": "2026-12-16T15:00:00.000Z",
+    "end": "2026-12-16T16:30:00.000Z",
+    "type": "lecture",
+    "title": "Other Event 1. Semester MET",
+    "course": "Other Event 1. Semester MET",
+    "context": "SO · Trattnig Uwe"
+   },
+   {
+    "uid": "MET2026_1071313",
+    "start": "2026-12-02T09:00:00.000Z",
+    "end": "2026-12-02T10:30:00.000Z",
+    "type": "exam",
+    "title": "Exam: Climate Change and Dynamics",
+    "course": "Climate Change and Dynamics",
+    "context": "WS46a.02.212 · Awan"
+   },
+   {
+    "uid": "MET2026_1021365",
+    "start": "2026-12-16T08:00:00.000Z",
+    "end": "2026-12-16T09:30:00.000Z",
+    "type": "exam",
+    "title": "Exam: Strategic Management - Cases in International Business (Success and Pitfall Studies)",
+    "course": "Strategic Management - Cases in International Business (Success and Pitfall Studies)",
+    "context": "WS46a.02.212 · Kuchler"
+   }
+  ]
+ },
+ "moodle-sample.ics": {
+  "name": "",
+  "kind": "moodle",
+  "events": [
+   {
+    "uid": "32077@moodle.fh-joanneum.at",
+    "start": "2026-11-01T22:59:00.000Z",
+    "end": "2026-11-01T22:59:00.000Z",
+    "type": "deadline",
+    "title": "Report submission for second attempt",
+    "course": "Digital Signal Processing",
+    "context": ""
+   },
+   {
+    "uid": "48839@moodle.fh-joanneum.at",
+    "start": "2026-11-01T22:59:00.000Z",
+    "end": "2026-11-01T22:59:00.000Z",
+    "type": "deadline",
+    "title": "Asynchronous assignment - Interim submissions",
+    "course": "Environmental Process Engineering",
+    "context": ""
+   },
+   {
+    "uid": "40252@moodle.fh-joanneum.at",
+    "start": "2026-11-03T11:00:00.000Z",
+    "end": "2026-11-03T11:00:00.000Z",
+    "type": "deadline",
+    "title": "Mini-Lecture Quiz",
+    "course": "Strategic Management - Cases in International Business (Success and Pitfall Studies)",
+    "context": ""
+   },
+   {
+    "uid": "48830@moodle.fh-joanneum.at",
+    "start": "2026-11-08T22:59:00.000Z",
+    "end": "2026-11-08T22:59:00.000Z",
+    "type": "deadline",
+    "title": "Final presentations",
+    "course": "Environmental Process Engineering",
+    "context": ""
+   },
+   {
+    "uid": "40100@moodle.fh-joanneum.at",
+    "start": "2026-10-27T08:00:00.000Z",
+    "end": "2026-10-27T08:00:00.000Z",
+    "type": "skip",
+    "title": "",
+    "course": "",
+    "context": ""
+   },
+   {
+    "uid": "45200@moodle.fh-joanneum.at",
+    "start": "2026-11-12T15:00:00.000Z",
+    "end": "2026-11-12T17:00:00.000Z",
+    "type": "event",
+    "title": "Guest talk",
+    "course": "",
+    "context": "Storage and Power-to-X Technologies"
+   },
+   {
+    "uid": "45157@moodle.fh-joanneum.at",
+    "start": "2027-01-05T07:45:00.000Z",
+    "end": "2027-01-05T07:45:00.000Z",
+    "type": "deadline",
+    "title": "Upload area - Phase 3",
+    "course": "Storage and Power-to-X Technologies",
+    "context": ""
+   }
+  ]
+ }
+}
