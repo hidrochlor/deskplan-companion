@@ -27,8 +27,10 @@ class FeedCourse {
 /// them. Every change is marked to send to DeskPlan (FeedSettingsSync), and
 /// each feed is downloaded straight from its server: no PC needed.
 class FeedService {
-  /// A feed is downloaded again when its copy is older than this.
-  static const maxAge = Duration(hours: 6);
+  /// A feed is downloaded again when its copy is older than this (sooner
+  /// when the user pulls to refresh). Short enough that an event added in
+  /// Outlook today shows the same day.
+  static const maxAge = Duration(hours: 1);
 
   final FeedStore store;
   final CalendarStore calendar;

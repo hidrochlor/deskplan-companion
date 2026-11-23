@@ -611,7 +611,7 @@ class _TaskListScreenState extends State<TaskListScreen>
   Widget _taskList(_Section section) {
     final items = _itemsOf(section);
     return SyncRefresh(
-      onRefresh: widget.sync.syncNow,
+      onRefresh: () => widget.sync.syncNow(freshFeeds: true),
       label: _syncLabel,
       child: items.isEmpty && (section != _Section.tasks || _series.isEmpty)
           ? ListView(
@@ -816,7 +816,7 @@ class _TaskListScreenState extends State<TaskListScreen>
     return CalendarView(
       entries: entries,
       asOf: _calendarOn ? _eventsAsOf : null,
-      onRefresh: widget.sync.syncNow,
+      onRefresh: () => widget.sync.syncNow(freshFeeds: true),
       syncLabel: _syncLabel,
       onOpenTask: _openFromCalendar,
     );
@@ -885,7 +885,7 @@ class _TaskListScreenState extends State<TaskListScreen>
     _Section.calendar => _calendar(),
     _Section.settings => _settings(),
     _Section.notes when !_notesOn => SyncRefresh(
-      onRefresh: widget.sync.syncNow,
+      onRefresh: () => widget.sync.syncNow(freshFeeds: true),
       label: _syncLabel,
       child: LayoutBuilder(
         builder: (context, box) => SingleChildScrollView(

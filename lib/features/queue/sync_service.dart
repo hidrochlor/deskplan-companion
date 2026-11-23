@@ -38,6 +38,10 @@ class SyncService {
   bool _busy = false;
   bool _again = false;
 
+  /// The user pulled to refresh: download every feed on the next run, not
+  /// only the ones older than [FeedService.maxAge].
+  bool _freshFeeds = false;
+
   SyncService(
     this._checker,
     this._processor,
@@ -54,8 +58,11 @@ class SyncService {
   Stream<SyncReport> get reports => _reports.stream;
 
   /// Starts a run. If one is already going, asks it to go round once more
-  /// afterwards, so a change made mid-run is not left waiting.
-  Future<void> syncNow() async {
+  /// afterwards, so a change made mid-run is not left waiting. [freshFeeds]:
+  /// the user asked (pull to refresh), so the calendar feeds are downloaded
+  /// even when the phone's copy is recent.
+  Future<void> syncNow({bool freshFeeds = false}) async {
+    if (freshFeeds) _freshFeeds = true;
     if (_busy) {
       _again = true;
       return;
@@ -181,8 +188,10 @@ class SyncService {
   }
 
   Future<void> _refreshFeeds() async {
+    final force = _freshFeeds;
+    _freshFeeds = false;
     try {
-      await _feeds?.refreshDue();
+      await _feeds?.refreshDue(force: force);
     } catch (_) {
       // Each feed keeps its last copy and says why; tried again next time.
     }
