@@ -15,11 +15,12 @@ class CalendarEntryRow extends StatelessWidget {
   final DateTime now;
   final VoidCallback onTap;
 
-  /// How it sits against the day's other blocks: (text, overlaps). An
-  /// overlap is shown in the warning colour.
-  final List<(String, bool)> relations;
+  /// What it overlaps that day ("Starts 15m before Lecture ends").
+  final List<String> relations;
 
-  /// Indented, as a step inside an unfolded assignment group.
+  /// Indented, as a step inside its unfolded assignment: no "Step · course"
+  /// line (the assignment above says it), and the date when it is on
+  /// another day than [day] ("Nov 20\n12:00").
   final bool nested;
 
   const CalendarEntryRow({
@@ -41,6 +42,9 @@ class CalendarEntryRow extends StatelessWidget {
     final next = DateTime(day.year, day.month, day.day + 1);
     final s = entry.start.toLocal();
     final e = entry.end.toLocal();
+    if (nested && !DateUtils.isSameDay(s, day)) {
+      return '${loc.formatShortMonthDay(s)}\n${hm(s)}';
+    }
     if (entry.isDue) return 'Due\n${hm(s)}';
     if (s == e) return hm(s);
     final startsBefore = s.isBefore(day);
@@ -55,7 +59,11 @@ class CalendarEntryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = DeskPlanColors.of(context);
     final dim = entry.dimmed(now);
-    final clash = relations.any((r) => r.$2);
+    final missed = entry.missed(now);
+    // An exam that has several dates, or is marked: its label is built here.
+    final exam = entry.examDate != null || entry.registered
+        ? entry.event
+        : null;
     final done = !entry.projected && (entry.task?.done ?? false);
     return Opacity(
       opacity: dim ? 0.5 : 1,
@@ -109,30 +117,61 @@ class CalendarEntryRow extends StatelessWidget {
                                   : null,
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            entry.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 12.5, color: c.muted),
-                          ),
+                          // "Task · WS 2026 · Missed", the last part in red;
+                          // a step inside its assignment only says "Missed".
+                          // An exam says which date it is right after
+                          // "Exam", before the room, so it is not cut off:
+                          // "Exam · Registered · Date 1 of 3 · WS46a…".
+                          if (!nested || missed) ...[
+                            const SizedBox(height: 2),
+                            Text.rich(
+                              TextSpan(
+                                text: nested
+                                    ? ''
+                                    : exam == null
+                                    ? entry.label
+                                    : exam.kind.label,
+                                children: [
+                                  if (entry.registered)
+                                    TextSpan(
+                                      text: ' · Registered',
+                                      style: TextStyle(
+                                        color: c.ok,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  if (entry.examDate case final date?)
+                                    TextSpan(text: ' · $date'),
+                                  if (exam != null && exam.context.isNotEmpty)
+                                    TextSpan(text: ' · ${exam.context}'),
+                                  if (missed)
+                                    TextSpan(
+                                      text: nested ? 'Missed' : ' · Missed',
+                                      style: TextStyle(
+                                        color: c.danger,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 12.5, color: c.muted),
+                            ),
+                          ],
                         ],
                       ),
                     ),
                   ),
-                  // A clash (or something right after): open it to see what.
+                  // A clash: open it to see what with.
                   if (relations.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(right: 12),
                       child: Icon(
-                        clash
-                            ? Icons.warning_amber_rounded
-                            : Icons.arrow_forward_rounded,
+                        Icons.error_outline,
                         size: 16,
-                        color: clash ? c.warn : c.faint,
-                        semanticLabel: clash
-                            ? 'Overlaps something'
-                            : 'Something right after',
+                        color: c.muted,
+                        semanticLabel: 'Overlaps something',
                       ),
                     ),
                   // A repeating task, on its stored days and the ones to come.

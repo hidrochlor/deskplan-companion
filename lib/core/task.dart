@@ -189,6 +189,12 @@ class Task {
     bool clearRepeat = false,
   }) {
     final placeChanged = kind != null || parentId != null || clearParent;
+    // Moved to another folder (or Home): DeskPlan's course was worked out
+    // from the old place, so forget it and show the new folder until
+    // DeskPlan sends the new one.
+    final moved =
+        (clearParent && this.parentId != null) ||
+        (parentId != null && parentId != this.parentId);
     return Task(
       id: id,
       title: title ?? this.title,
@@ -207,8 +213,8 @@ class Task {
       createdAt: createdAt,
       createdKnown: createdKnown,
       doc: doc ?? this.doc,
-      course: course,
-      courseKnown: courseKnown,
+      course: moved ? null : course,
+      courseKnown: moved ? false : courseKnown,
       source: source,
       repeat: clearRepeat ? null : (repeat ?? this.repeat),
       // Setting or clearing it makes it known, so it is sent.

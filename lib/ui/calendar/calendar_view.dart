@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../core/task.dart';
+import '../../features/calendar/calendar_event.dart';
+import '../../features/calendar/exam_dates.dart';
 import '../date_text.dart';
 import '../sync_refresh.dart';
 import '../theme/deskplan_colors.dart';
+import 'agenda_filter.dart';
 import 'calendar_entry.dart';
 import 'calendar_entry_row.dart';
 import 'event_details_sheet.dart';
@@ -25,13 +28,19 @@ class CalendarView extends StatefulWidget {
   /// when none have been fetched yet.
   final DateTime? asOf;
 
-  /// Opens the phone's item, with how it sits against the day's other
-  /// blocks (text, overlaps) to show at the top of its sheet.
-  final void Function(Task task, List<(String, bool)> clashes) onOpenTask;
+  /// Opens the phone's item, with what it overlaps that day to show at the
+  /// top of its sheet.
+  final void Function(Task task, List<String> clashes) onOpenTask;
   final Future<void> Function() onRefresh;
 
   /// What the pill says while a pull-down sync runs.
   final String syncLabel;
+
+  /// The exam dates and which one is registered for, for an exam's sheet.
+  final ExamDates exams;
+
+  /// Marks an exam date as the one registered for (or not).
+  final Future<void> Function(CalendarEvent event, bool registered)? onRegister;
 
   /// For tests: the moment taken as now.
   final DateTime Function() now;
@@ -43,6 +52,8 @@ class CalendarView extends StatefulWidget {
     required this.onOpenTask,
     required this.onRefresh,
     this.syncLabel = 'Syncing with DeskPlan…',
+    this.exams = ExamDates.none,
+    this.onRegister,
     this.now = DateTime.now,
   });
 
@@ -58,6 +69,9 @@ class _CalendarViewState extends State<CalendarView> {
   /// Unfolded step groups, by day and assignment id. Folded by default.
   final _open = <String>{};
 
+  /// What the agenda is narrowed to; empty shows everything.
+  final _filters = <AgendaFilter>{};
+
   @override
   void initState() {
     super.initState();
@@ -71,11 +85,30 @@ class _CalendarViewState extends State<CalendarView> {
     return DateTime(n.year, n.month, n.day);
   }
 
+  /// Everything on [day], steps included (for clashes).
   List<CalendarEntry> _on(DateTime day) =>
       widget.entries.where((e) => e.isOn(day)).toList()
         ..sort(CalendarEntry.compare);
 
-  void _openEntry(CalendarEntry e, List<(String, bool)> clashes) {
+  /// Every assignment's steps, by assignment id, soonest first. A step
+  /// lives inside its assignment's row (an assignment always has a due
+  /// date, so it is always on the calendar): it gets no row or dot of its
+  /// own.
+  Map<String, List<CalendarEntry>> get _stepsOf {
+    final out = <String, List<CalendarEntry>>{};
+    for (final e in widget.entries) {
+      if (e.parentId case final id?) (out[id] ??= []).add(e);
+    }
+    for (final steps in out.values) {
+      steps.sort(CalendarEntry.compare);
+    }
+    return out;
+  }
+
+  /// True when [e] gets a row (and a dot) of its own: anything but a step.
+  static bool _listed(CalendarEntry e) => e.parentId == null;
+
+  void _openEntry(CalendarEntry e, List<String> clashes) {
     final event = e.event;
     if (event != null) {
       EventDetailsSheet.show(
@@ -86,12 +119,14 @@ class _CalendarViewState extends State<CalendarView> {
           for (final x in widget.entries)
             if (x.event != null) x.event!,
         ],
+        exams: widget.exams,
+        onRegister: widget.onRegister,
       );
     } else {
       // A step opens its assignment: say which step each line is about.
       widget.onOpenTask(e.task!, [
-        for (final (text, overlaps) in clashes)
-          (e.parentId == null ? text : '${e.title}: $text', overlaps),
+        for (final text in clashes)
+          e.parentId == null ? text : '${e.title}: $text',
       ]);
     }
   }
@@ -122,39 +157,42 @@ class _CalendarViewState extends State<CalendarView> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-          child: SizedBox(
-            width: double.infinity,
-            child: SegmentedButton<CalendarMode>(
-              segments: const [
-                ButtonSegment(
-                  value: CalendarMode.month,
-                  icon: Icon(Icons.calendar_view_month_outlined, size: 18),
-                  label: Text('Month'),
-                ),
-                ButtonSegment(
-                  value: CalendarMode.agenda,
-                  icon: Icon(Icons.view_agenda_outlined, size: 18),
-                  label: Text('Agenda'),
-                ),
-              ],
-              selected: {_mode},
-              showSelectedIcon: false,
-              onSelectionChanged: (s) => setState(() => _mode = s.first),
+    // The pull handler wraps the whole page, so its pill comes down from
+    // the top edge over Month / Agenda, as on the other pages. Only the
+    // list below scrolls, so only it starts a pull.
+    return SyncRefresh(
+      onRefresh: widget.onRefresh,
+      label: widget.syncLabel,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+            child: SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<CalendarMode>(
+                segments: const [
+                  ButtonSegment(
+                    value: CalendarMode.month,
+                    icon: Icon(Icons.calendar_view_month_outlined, size: 18),
+                    label: Text('Month'),
+                  ),
+                  ButtonSegment(
+                    value: CalendarMode.agenda,
+                    icon: Icon(Icons.view_agenda_outlined, size: 18),
+                    label: Text('Agenda'),
+                  ),
+                ],
+                selected: {_mode},
+                showSelectedIcon: false,
+                onSelectionChanged: (s) => setState(() => _mode = s.first),
+              ),
             ),
           ),
-        ),
-        Expanded(
-          child: SyncRefresh(
-            onRefresh: widget.onRefresh,
-            label: widget.syncLabel,
+          Expanded(
             child: _mode == CalendarMode.month ? _monthView() : _agenda(),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -204,16 +242,28 @@ class _CalendarViewState extends State<CalendarView> {
     );
   }
 
-  /// The day's rows. Two or more steps of one assignment fold into one
-  /// row ("4 steps · Essay"); tap it to show them.
-  List<Widget> _rows(DateTime day, List<CalendarEntry> entries) {
+  /// The day's rows. An assignment's steps live inside its row, all of
+  /// them, whatever day they are on (unfold it to see them). Clashes are
+  /// worked out against [all] of the day's entries (when only some are
+  /// shown, a task still says it overlaps a hidden lecture), and for a step
+  /// against its own day.
+  List<Widget> _rows(
+    DateTime day,
+    List<CalendarEntry> entries, {
+    List<CalendarEntry>? all,
+  }) {
     final now = widget.now();
-    final stepsOf = <String, List<CalendarEntry>>{};
-    for (final e in entries) {
-      if (e.parentId case final id?) (stepsOf[id] ??= []).add(e);
-    }
+    final everything = all ?? entries;
+    final stepsOf = _stepsOf;
+
+    /// What [e] overlaps on its own day (a step may be on another).
+    List<String> relationsOf(CalendarEntry e) => e.relationsIn(
+      e.isOn(day) ? everything : _on(DateUtils.dateOnly(e.start.toLocal())),
+      now,
+    );
+
     Widget row(CalendarEntry e, {bool nested = false}) {
-      final relations = e.relationsIn(entries, now);
+      final relations = relationsOf(e);
       return CalendarEntryRow(
         entry: e,
         day: day,
@@ -224,33 +274,30 @@ class _CalendarViewState extends State<CalendarView> {
       );
     }
 
-    final shown = <String>{};
     final out = <Widget>[];
     for (final e in entries) {
-      final id = e.parentId;
-      final group = id == null ? null : stepsOf[id]!;
-      if (group == null || group.length < 2) {
+      final steps = e.event == null && e.task!.isAssignment
+          ? stepsOf[e.task!.id]
+          : null;
+      if (steps == null) {
         out.add(row(e));
         continue;
       }
-      if (!shown.add(id!)) continue;
-      final key = '${day.toIso8601String()}|$id';
+      final key = '${day.toIso8601String()}|${e.task!.id}';
       final isOpen = _open.contains(key);
       out.add(
         StepGroupRow(
-          steps: group,
-          title: e.parentTitle ?? 'Assignment',
-          day: day,
+          assignment: e,
+          steps: steps,
           now: now,
           open: isOpen,
-          clashes: group.any(
-            (s) => s.relationsIn(entries, now).any((r) => r.$2),
-          ),
-          onTap: () =>
+          clashes: steps.any((s) => relationsOf(s).isNotEmpty),
+          onToggle: () =>
               setState(() => isOpen ? _open.remove(key) : _open.add(key)),
+          onOpen: () => _openEntry(e, const []),
         ),
       );
-      if (isOpen) out.addAll(group.map((s) => row(s, nested: true)));
+      if (isOpen) out.addAll(steps.map((s) => row(s, nested: true)));
     }
     return out;
   }
@@ -295,7 +342,8 @@ class _CalendarViewState extends State<CalendarView> {
 
   Widget _monthView() {
     final c = DeskPlanColors.of(context);
-    final dayEntries = _on(_selected);
+    final dayAll = _on(_selected);
+    final dayEntries = dayAll.where(_listed).toList();
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: 120),
@@ -319,7 +367,10 @@ class _CalendarViewState extends State<CalendarView> {
               month: _month,
               selected: _selected,
               today: _today,
-              dotsOf: (day) => _on(day).map((e) => e.color).toList(),
+              dotsOf: (day) => [
+                for (final e in _on(day))
+                  if (_listed(e)) e.color,
+              ],
               onSelect: (day) => setState(() => _selected = day),
             ),
           ),
@@ -328,7 +379,7 @@ class _CalendarViewState extends State<CalendarView> {
         if (dayEntries.isEmpty)
           _empty('Nothing on this day')
         else
-          ..._rows(_selected, dayEntries),
+          ..._rows(_selected, dayEntries, all: dayAll),
         _asOfLine(),
       ],
     );
@@ -350,21 +401,54 @@ class _CalendarViewState extends State<CalendarView> {
         day = DateTime(day.year, day.month, day.day + 1);
       }
     }
-    final ordered = days.keys.toList()..sort();
+    // Days with nothing left once filtered drop out.
+    final shown = <DateTime, List<CalendarEntry>>{
+      for (final MapEntry(key: day, value: list) in days.entries)
+        if (list
+                .where((e) => _listed(e) && AgendaFilter.shows(_filters, e))
+                .toList()
+            case final kept when kept.isNotEmpty)
+          day: kept..sort(CalendarEntry.compare),
+    };
+    final ordered = shown.keys.toList()..sort();
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: 120),
       children: [
+        _filterChips(),
         if (ordered.isEmpty) ...[
           _sectionLabel(_dayTitle(today)),
           _empty('Nothing coming up'),
         ],
         for (final day in ordered) ...[
           _sectionLabel(_dayTitle(day)),
-          ..._rows(day, days[day]!..sort(CalendarEntry.compare)),
+          ..._rows(day, shown[day]!, all: days[day]!),
         ],
         _asOfLine(),
       ],
+    );
+  }
+
+  /// Tasks, Assignments, Exams: tick any to see only those. None ticked
+  /// shows everything.
+  Widget _filterChips() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: Row(
+        children: [
+          for (final f in AgendaFilter.values)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilterChip(
+                label: Text(f.label),
+                selected: _filters.contains(f),
+                onSelected: (on) =>
+                    setState(() => on ? _filters.add(f) : _filters.remove(f)),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

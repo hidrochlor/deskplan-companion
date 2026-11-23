@@ -6,6 +6,7 @@ import '../../core/task_tree.dart';
 import '../../core/time_relation.dart';
 import '../../features/calendar/calendar_event.dart';
 import '../../features/calendar/calendar_event_kind.dart';
+import '../../features/calendar/exam_dates.dart';
 import '../course_names.dart';
 
 /// One thing on the calendar: one of the phone's own items that has an end,
@@ -38,6 +39,15 @@ class CalendarEntry {
   final String? parentId;
   final String? parentTitle;
 
+  /// For an exam with several dates: "Date 2 of 3".
+  final String? examDate;
+
+  /// The exam date the user registered for.
+  final bool registered;
+
+  /// Another date of this exam is the one registered for: dimmed, no clash.
+  final bool passedOver;
+
   const CalendarEntry._({
     required this.title,
     required this.label,
@@ -50,6 +60,9 @@ class CalendarEntry {
     this.projected = false,
     this.parentId,
     this.parentTitle,
+    this.examDate,
+    this.registered = false,
+    this.passedOver = false,
   });
 
   /// The PC's calendar colours (DESIGN.md, "Calendar colours"). The same in
@@ -60,7 +73,11 @@ class CalendarEntry {
   static const assignmentColor = Color(0xFFFF7A8A);
   static const taskColor = Color(0xFF7C8CFF);
 
-  factory CalendarEntry.ofEvent(CalendarEvent e) => CalendarEntry._(
+  /// [exams] numbers an exam's dates and says which one is registered for.
+  factory CalendarEntry.ofEvent(
+    CalendarEvent e, [
+    ExamDates exams = ExamDates.none,
+  ]) => CalendarEntry._(
     title: e.title,
     label: e.label,
     start: e.start,
@@ -71,11 +88,19 @@ class CalendarEntry {
       CalendarEventKind.event => eventColor,
     },
     event: e,
+    examDate: exams.labelOf(e),
+    registered: exams.isRegistered(e),
+    passedOver: exams.isPassedOver(e),
   );
 
-  /// Dimmed: a past event (it counts as done), or a finished item.
+  /// Dimmed: anything whose end has passed, an item already done, or an
+  /// exam date passed over for the one registered for.
   bool dimmed(DateTime now) =>
-      event != null ? event!.isPast(now) : !projected && task!.done;
+      passedOver || end.isBefore(now) || (!projected && (task?.done ?? false));
+
+  /// One of the phone's items whose end passed while it was not done.
+  bool missed(DateTime now) =>
+      task != null && !projected && !task!.done && end.isBefore(now);
 
   /// The entries for the phone's items: assignments and deadline tasks at
   /// their end, time blocks and steps from start to end. Notes have no times.
@@ -150,27 +175,16 @@ class CalendarEntry {
   /// Runs from a start to a later end (not a due time).
   bool get isBlock => !isDue && start.isBefore(end);
 
-  /// Lines saying how this sits against the other blocks in [day]: "Ends
-  /// 15m into Lecture", "Starts right after Lab". Overlaps come first. Past
-  /// and finished entries are left out.
-  List<(String, bool)> relationsIn(List<CalendarEntry> day, DateTime now) {
+  /// What this overlaps among the other blocks in [day]: "Starts 15m
+  /// before Lecture ends", "Ends 30m after Lab starts". Past and finished
+  /// entries are left out.
+  List<String> relationsIn(List<CalendarEntry> day, DateTime now) {
     if (!isBlock || dimmed(now)) return const [];
-    final out = <(String, bool)>[];
-    for (final other in day) {
-      if (identical(other, this) || !other.isBlock || other.dimmed(now)) {
-        continue;
-      }
-      final r = TimeRelation.of(
-        start,
-        end,
-        other.start,
-        other.end,
-        other.title,
-      );
-      if (r != null) out.add((r.text, r.overlaps));
-    }
-    out.sort((a, b) => (a.$2 == b.$2) ? 0 : (a.$2 ? -1 : 1));
-    return out;
+    return [
+      for (final other in day)
+        if (!identical(other, this) && other.isBlock && !other.dimmed(now))
+          ?TimeRelation.of(start, end, other.start, other.end, other.title),
+    ];
   }
 
   /// Soonest first; on a tie the longer one first.

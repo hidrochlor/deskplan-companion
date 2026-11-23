@@ -3,56 +3,59 @@ import 'package:flutter/material.dart';
 import '../theme/deskplan_colors.dart';
 import 'calendar_entry.dart';
 
-/// Several steps of one assignment on one day, folded into one row: the
-/// time span they cover, "4 steps · Essay", how many are done, and a
-/// chevron. Tapping it unfolds (or folds) the steps beneath it.
+/// An assignment on its due day, with its steps living inside it: the due
+/// time, the title, its label ("Assignment · WS 2026", then "· Missed" in
+/// red), and at the right the steps done ("3/4") over a chevron. Tapping
+/// the row opens the assignment; the chevron shows every step, whatever
+/// day it is on.
 class StepGroupRow extends StatelessWidget {
+  final CalendarEntry assignment;
+
+  /// All its steps, soonest first.
   final List<CalendarEntry> steps;
-  final String title;
-  final DateTime day;
   final DateTime now;
   final bool open;
 
-  /// A step overlaps something else that day.
+  /// A step overlaps something else on its day.
   final bool clashes;
-  final VoidCallback onTap;
+
+  /// Shows or hides the steps.
+  final VoidCallback onToggle;
+
+  /// Opens the assignment.
+  final VoidCallback onOpen;
 
   const StepGroupRow({
     super.key,
+    required this.assignment,
     required this.steps,
-    required this.title,
-    required this.day,
     required this.now,
     required this.open,
     required this.clashes,
-    required this.onTap,
+    required this.onToggle,
+    required this.onOpen,
   });
-
-  String _span(BuildContext context) {
-    final loc = MaterialLocalizations.of(context);
-    String hm(DateTime t) => loc.formatTimeOfDay(
-      TimeOfDay.fromDateTime(t.toLocal()),
-      alwaysUse24HourFormat: true,
-    );
-    final next = DateTime(day.year, day.month, day.day + 1);
-    var first = steps.first.start.toLocal();
-    var last = steps.first.end.toLocal();
-    for (final s in steps) {
-      if (s.start.toLocal().isBefore(first)) first = s.start.toLocal();
-      if (s.end.toLocal().isAfter(last)) last = s.end.toLocal();
-    }
-    if (first.isBefore(day)) first = day;
-    final to = last.isBefore(next) ? hm(last) : 'onward';
-    return first == last ? hm(first) : '${hm(first)}\n$to';
-  }
 
   @override
   Widget build(BuildContext context) {
     final c = DeskPlanColors.of(context);
+    final loc = MaterialLocalizations.of(context);
+    final a = assignment;
+    final n = steps.length;
     final done = steps.where((s) => s.task?.done ?? false).length;
-    final allDone = done == steps.length;
+    final missedSteps = steps.where((s) => s.missed(now)).length;
+    final missed = a.missed(now)
+        ? ' · Missed'
+        : missedSteps > 0
+        ? ' · $missedSteps missed'
+        : null;
+    final allDim = a.dimmed(now) && steps.every((s) => s.dimmed(now));
+    final due = loc.formatTimeOfDay(
+      TimeOfDay.fromDateTime(a.end.toLocal()),
+      alwaysUse24HourFormat: true,
+    );
     return Opacity(
-      opacity: allDone ? 0.5 : 1,
+      opacity: allDim ? 0.5 : 1,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
         child: Material(
@@ -60,18 +63,18 @@ class StepGroupRow extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            onTap: onTap,
+            onTap: onOpen,
             child: IntrinsicHeight(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Container(width: 4, color: steps.first.color),
+                  Container(width: 4, color: a.color),
                   SizedBox(
                     width: 74,
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(10, 11, 4, 11),
                       child: Text(
-                        _span(context),
+                        'Due\n$due',
                         softWrap: false,
                         overflow: TextOverflow.fade,
                         style: TextStyle(
@@ -85,13 +88,13 @@ class StepGroupRow extends StatelessWidget {
                   ),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(4, 10, 8, 10),
+                      padding: const EdgeInsets.fromLTRB(4, 10, 4, 10),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            '${steps.length} steps · $title',
+                            a.title,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -101,40 +104,65 @@ class StepGroupRow extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 2),
-                          Row(
-                            children: [
-                              Text(
-                                '$done of ${steps.length} done',
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  color: c.muted,
-                                ),
-                              ),
-                              if (clashes && !open) ...[
-                                const SizedBox(width: 8),
-                                Icon(
-                                  Icons.warning_amber_rounded,
-                                  size: 13,
-                                  color: c.warn,
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  'Overlaps',
-                                  style: TextStyle(fontSize: 12, color: c.warn),
-                                ),
+                          Text.rich(
+                            TextSpan(
+                              text: a.label,
+                              children: [
+                                if (missed != null)
+                                  TextSpan(
+                                    text: missed,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: c.danger,
+                                    ),
+                                  ),
                               ],
-                            ],
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12.5, color: c.muted),
                           ),
                         ],
                       ),
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child: Icon(
-                      open ? Icons.expand_less : Icons.expand_more,
-                      color: c.muted,
-                      semanticLabel: open ? 'Hide steps' : 'Show steps',
+                  if (clashes && !open)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: Icon(
+                        Icons.error_outline,
+                        size: 16,
+                        color: c.muted,
+                        semanticLabel: 'A step overlaps something',
+                      ),
+                    ),
+                  // The steps done over the chevron: only this shows them.
+                  InkWell(
+                    onTap: onToggle,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            '$done/$n',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: done == n ? c.ok : c.muted,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            open ? Icons.expand_less : Icons.expand_more,
+                            size: 20,
+                            color: c.muted,
+                            semanticLabel: open ? 'Hide steps' : 'Show steps',
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],

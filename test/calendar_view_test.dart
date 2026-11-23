@@ -6,6 +6,7 @@ import 'package:deskplan_companion/ui/calendar/calendar_entry.dart';
 import 'package:deskplan_companion/ui/calendar/calendar_entry_row.dart';
 import 'package:deskplan_companion/ui/calendar/calendar_view.dart';
 import 'package:deskplan_companion/ui/course_names.dart';
+import 'package:deskplan_companion/ui/sync_refresh.dart';
 import 'package:deskplan_companion/ui/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -135,6 +136,192 @@ void main() {
         .opacity;
     expect(opacityOf('Morning lecture'), lessThan(1));
     expect(opacityOf('Storage and Power-to-X Technologies'), 1);
+  });
+
+  testWidgets('a past task is dimmed; missed when not done', (tester) async {
+    Task task(String id, {bool done = false}) => Task(
+      id: id,
+      title: id,
+      start: DateTime(2026, 10, 30, 8),
+      end: DateTime(2026, 10, 30, 9),
+      done: done,
+      updatedAt: DateTime.utc(2026),
+      course: 'WS 2026',
+      courseKnown: true,
+    );
+    final later = Task(
+      id: 'Later',
+      title: 'Later',
+      start: DateTime(2026, 10, 30, 14),
+      end: DateTime(2026, 10, 30, 15),
+      updatedAt: DateTime.utc(2026),
+    );
+    final items = [task('Skipped'), task('Ticked', done: true), later];
+    await _pump(
+      tester,
+      CalendarEntry.ofItems(
+        items,
+        TaskTree(items),
+        CourseNames(const [], items),
+      ),
+    );
+    double opacityOf(String title) => tester
+        .widget<Opacity>(
+          find.ancestor(of: find.text(title), matching: find.byType(Opacity)),
+        )
+        .opacity;
+    expect(opacityOf('Skipped'), lessThan(1));
+    expect(opacityOf('Ticked'), lessThan(1));
+    expect(opacityOf('Later'), 1);
+    expect(find.text('Task · WS 2026 · Missed', findRichText: true), findsOne);
+    expect(find.text('Task · WS 2026', findRichText: true), findsOne);
+  });
+
+  testWidgets('the agenda filters by tasks, assignments (with steps), exams', (
+    tester,
+  ) async {
+    final day = DateTime(2026, 10, 31);
+    Task item(String id, {TaskKind kind = TaskKind.task, String? parent}) =>
+        Task(
+          id: id,
+          title: id,
+          start: kind == TaskKind.assignment
+              ? null
+              : day.add(Duration(hours: 9)),
+          end: day.add(const Duration(hours: 10)),
+          kind: kind,
+          parentId: parent,
+          updatedAt: DateTime.utc(2026),
+        );
+    final items = [
+      item('Laundry'),
+      item('Essay', kind: TaskKind.assignment),
+      item('Outline', parent: 'Essay'),
+    ];
+    final exam = _event(
+      'x',
+      kind: 'exam',
+      title: 'Exam: Physics',
+      start: day.add(const Duration(hours: 13)),
+      end: day.add(const Duration(hours: 15)),
+    );
+    final talk = _event(
+      'l',
+      start: day.add(const Duration(hours: 16)),
+      end: day.add(const Duration(hours: 17)),
+    );
+    await _pump(tester, [
+      ...CalendarEntry.ofItems(
+        items,
+        TaskTree(items),
+        CourseNames(const [], items),
+      ),
+      CalendarEntry.ofEvent(exam),
+      CalendarEntry.ofEvent(talk),
+    ]);
+    await tester.tap(find.text('Agenda'));
+    await tester.pumpAndSettle();
+    final all = ['Laundry', 'Essay', 'Exam: Physics', lecture.title];
+    for (final t in all) {
+      expect(find.text(t), findsOneWidget, reason: t);
+    }
+    // The step lives inside its assignment's row.
+    expect(find.text('Outline'), findsNothing);
+    expect(find.text('0/1'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilterChip, 'Exams'));
+    await tester.pumpAndSettle();
+    expect(find.text('Exam: Physics'), findsOneWidget);
+    for (final t in ['Laundry', 'Essay', 'Outline', lecture.title]) {
+      expect(find.text(t), findsNothing, reason: t);
+    }
+
+    // A step counts as its assignment.
+    await tester.tap(find.widgetWithText(FilterChip, 'Assignments'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel(RegExp('Show steps')));
+    await tester.pumpAndSettle();
+    for (final t in ['Essay', 'Outline', 'Exam: Physics']) {
+      expect(find.text(t), findsOneWidget, reason: t);
+    }
+    expect(find.text('Laundry'), findsNothing);
+    expect(find.text(lecture.title), findsNothing);
+  });
+
+  testWidgets('steps live inside their assignment, not on their own days', (
+    tester,
+  ) async {
+    final due = DateTime(2026, 10, 31, 13);
+    final midterm = Task(
+      id: 'mid',
+      title: 'MidTerm',
+      end: due,
+      kind: TaskKind.assignment,
+      updatedAt: DateTime.utc(2026),
+    );
+    Task step(String id, DateTime start) => Task(
+      id: id,
+      title: id,
+      start: start,
+      end: start.add(const Duration(minutes: 15)),
+      parentId: 'mid',
+      updatedAt: DateTime.utc(2026),
+    );
+    final items = [
+      midterm,
+      step('Vocabulary', DateTime(2026, 10, 31, 12)),
+      step('Grammar', DateTime(2026, 10, 31, 12, 15)),
+      // Earlier today and not done: missed.
+      step('Revise', DateTime(2026, 10, 30, 9)),
+    ];
+    final opened = await _pump(
+      tester,
+      CalendarEntry.ofItems(
+        items,
+        TaskTree(items),
+        CourseNames(const [], items),
+      ),
+    );
+    await tester.tap(find.text('Agenda'));
+    await tester.pumpAndSettle();
+
+    // Today: MidTerm's step is not listed on its own.
+    expect(find.text('Revise'), findsNothing);
+    expect(find.text('MidTerm'), findsOneWidget);
+    // Due tomorrow: one row, the assignment, with all three steps inside.
+    // The steps done sit over the chevron, so "Missed" has room.
+    expect(find.text('Assignment · 1 missed'), findsOneWidget);
+    expect(find.text('0/3'), findsOneWidget);
+    expect(find.text('Due\n13:00'), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel(RegExp('Show steps')));
+    await tester.pumpAndSettle();
+    for (final t in ['Revise', 'Vocabulary', 'Grammar']) {
+      expect(find.text(t), findsOneWidget, reason: t);
+    }
+    // Inside the assignment a step does not say "Step" again; a step on
+    // another day says which day.
+    expect(find.textContaining('Step'), findsNothing);
+    expect(find.text('Missed'), findsOneWidget);
+    expect(find.text('Oct 30\n09:00'), findsOneWidget);
+
+    // The row itself opens the assignment.
+    await tester.tap(find.text('MidTerm'));
+    await tester.pumpAndSettle();
+    expect(opened.single.id, 'mid');
+  });
+
+  testWidgets('the pull-to-sync pill comes down over Month / Agenda', (
+    tester,
+  ) async {
+    await _pump(tester, const []);
+    expect(
+      find.ancestor(
+        of: find.byType(SegmentedButton<CalendarMode>),
+        matching: find.byType(SyncRefresh),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('tapping an item opens it', (tester) async {

@@ -4,6 +4,7 @@ import 'package:timezone/timezone.dart' as tz;
 import '../reminders/notification_target.dart';
 import '../reminders/reminder_options_store.dart';
 import 'calendar_event.dart';
+import 'exam_choice_store.dart';
 import 'exam_reminder_planner.dart';
 import 'exam_reminders.dart';
 
@@ -22,8 +23,15 @@ class LocalExamReminders implements ExamReminders {
   final ReminderOptionsStore _options;
   final DateTime Function() _now;
 
-  LocalExamReminders(this._plugin, this._options, {DateTime Function()? now})
-    : _now = now ?? DateTime.now;
+  /// The exam dates the user registered for: the others get no reminder.
+  final ExamChoiceStore _choices;
+
+  LocalExamReminders(
+    this._plugin,
+    this._options, {
+    DateTime Function()? now,
+    this._choices = const ExamChoiceStore(),
+  }) : _now = now ?? DateTime.now;
 
   @override
   Future<void> replace(
@@ -42,7 +50,12 @@ class LocalExamReminders implements ExamReminders {
           AndroidFlutterLocalNotificationsPlugin
         >();
     final exact = await android?.canScheduleExactNotifications() ?? false;
-    for (final r in ExamReminderPlanner.forEvents(now, _now())) {
+    final registered = await _choices.load();
+    for (final r in ExamReminderPlanner.forEvents(
+      now,
+      _now(),
+      registered: registered,
+    )) {
       await _plugin.zonedSchedule(
         id: r.notificationId,
         title: r.title,

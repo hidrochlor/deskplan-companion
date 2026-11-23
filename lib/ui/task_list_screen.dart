@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../features/background/background_guide_store.dart';
 import '../features/calendar/calendar_event.dart';
 import '../features/calendar/calendar_store.dart';
+import '../features/calendar/exam_choice_store.dart';
+import '../features/calendar/exam_dates.dart';
 import '../features/connection/connection_light.dart';
 import '../features/connection/unreachable_cause.dart';
 import '../features/discovery/typed_address_store.dart';
@@ -100,6 +102,9 @@ class TaskListScreen extends StatefulWidget {
   /// DeskPlan's calendar events kept on the phone.
   final CalendarStore calendar;
 
+  /// The exam dates the user registered for (kept on this phone).
+  final ExamChoiceStore examChoices;
+
   /// Tapped notifications: each opens the item or exam it is about.
   final NotificationTaps notificationTaps;
 
@@ -122,6 +127,7 @@ class TaskListScreen extends StatefulWidget {
     required this.reminderPermissions,
     required this.guideStore,
     required this.calendar,
+    this.examChoices = const ExamChoiceStore(),
     required this.notificationTaps,
     this.feeds,
   });
@@ -185,6 +191,9 @@ class _TaskListScreenState extends State<TaskListScreen>
   /// feeds. Only then are its events shown (protocol.md section 5).
   bool _calendarOn = false;
   List<CalendarEvent> _events = const [];
+
+  /// Each exam's dates numbered, and the ones registered for.
+  ExamDates _exams = ExamDates.none;
   DateTime? _eventsAsOf;
 
   /// The PC's name, from the last time it was reached.
@@ -349,7 +358,13 @@ class _TaskListScreenState extends State<TaskListScreen>
           _toast(['That event is no longer in your calendar']);
           return;
         }
-        await EventDetailsSheet.show(context, found.first, all: _events);
+        await EventDetailsSheet.show(
+          context,
+          found.first,
+          all: _events,
+          exams: _exams,
+          onRegister: _register,
+        );
     }
   }
 
@@ -370,6 +385,7 @@ class _TaskListScreenState extends State<TaskListScreen>
         ? await widget.calendar.events()
         : const <CalendarEvent>[];
     final asOf = calendarOn ? await widget.calendar.asOf() : null;
+    final registered = await widget.examChoices.load();
     if (mounted) {
       setState(() {
         _folders = [...?info?.destinations.where((d) => !d.isReceivedFiles)];
@@ -381,6 +397,7 @@ class _TaskListScreenState extends State<TaskListScreen>
         _notesOn = info?.syncsNotes ?? false;
         _calendarOn = calendarOn;
         _events = events;
+        _exams = ExamDates.of(events, registered);
         _eventsAsOf = asOf;
         _pcName = info?.name;
       });
@@ -460,7 +477,7 @@ class _TaskListScreenState extends State<TaskListScreen>
   Future<void> _open([
     Task? task,
     TaskKind kind = TaskKind.task,
-    List<(String, bool)> clashes = const [],
+    List<String> clashes = const [],
   ]) async {
     if (task != null && task.isNote) return _openNote(task);
     if (task != null && task.isAssignment) {
@@ -495,7 +512,7 @@ class _TaskListScreenState extends State<TaskListScreen>
   /// to delete it whole.
   Future<void> _openSeries(
     TaskSeries series, [
-    List<(String, bool)> clashes = const [],
+    List<String> clashes = const [],
   ]) async {
     final action = await SeriesDetailsSheet.show(
       context,
@@ -697,7 +714,12 @@ class _TaskListScreenState extends State<TaskListScreen>
     final c = DeskPlanColors.of(context);
     final now = DateTime.now();
     final open = items.where((t) => !t.done).toList();
-    final done = items.where((t) => t.done).toList();
+    // Done and submitted: the latest due first (Nov 20 before Nov 5), those
+    // with no due date last. [items] is soonest first.
+    final done = [
+      ...items.where((t) => t.done && t.end != null).toList().reversed,
+      ...items.where((t) => t.done && t.end == null),
+    ];
     final isTasks = section == _Section.tasks;
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -821,15 +843,29 @@ class _TaskListScreenState extends State<TaskListScreen>
           courses,
           horizon: DateTime.now().add(const Duration(days: 183)),
         ),
-      if (_calendarOn) ..._events.map(CalendarEntry.ofEvent),
+      if (_calendarOn)
+        for (final e in _events) CalendarEntry.ofEvent(e, _exams),
     ];
     return CalendarView(
       entries: entries,
       asOf: _calendarOn ? _eventsAsOf : null,
       onRefresh: () => widget.sync.syncNow(freshFeeds: true),
       syncLabel: _syncLabel,
+      exams: _exams,
+      onRegister: _register,
       onOpenTask: _openFromCalendar,
     );
+  }
+
+  /// Marks [exam] as the date registered for (or clears it): its course's
+  /// other dates dim, and their reminders are dropped.
+  Future<void> _register(CalendarEvent exam, bool registered) async {
+    await widget.examChoices.choose(
+      ExamDates.keyOf(exam),
+      registered ? exam.id : null,
+    );
+    await _reload();
+    await widget.onReminderOptionsChanged();
   }
 
   /// Every step of every assignment.
@@ -843,7 +879,7 @@ class _TaskListScreenState extends State<TaskListScreen>
   /// [clashes] say how it sits against the day's other blocks.
   Future<void> _openFromCalendar(
     Task t, [
-    List<(String, bool)> clashes = const [],
+    List<String> clashes = const [],
   ]) async {
     final series = _series.where((s) => s.contains(t.id)).firstOrNull;
     if (series != null) return _openSeries(series, clashes);
@@ -931,31 +967,35 @@ class _TaskListScreenState extends State<TaskListScreen>
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(section.label),
+          // Why DeskPlan can't be reached sits between the page's name and
+          // the link icon, so it takes no room from the page.
+          title: Row(
+            children: [
+              Text(section.label),
+              if (_blockedReason != null) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: ConnectionBanner(
+                      cause: _blockedCause ?? UnreachableCause.other,
+                      message: _blockedReason!,
+                      waiting: _waiting,
+                      onTap: _openConnection,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
           actions: [
             ConnectionIconButton(light: _light, onPressed: _openConnection),
             const SizedBox(width: 4),
           ],
         ),
-        body: Column(
-          children: [
-            if (_blockedReason != null)
-              ConnectionBanner(
-                cause: _blockedCause ?? UnreachableCause.other,
-                message: _blockedReason!,
-                waiting: _waiting,
-                onPair: _openConnection,
-              ),
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 160),
-                child: KeyedSubtree(
-                  key: ValueKey(section),
-                  child: _page(section),
-                ),
-              ),
-            ),
-          ],
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 160),
+          child: KeyedSubtree(key: ValueKey(section), child: _page(section)),
         ),
         floatingActionButton: _canAdd
             ? FloatingActionButton(

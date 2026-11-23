@@ -1,3 +1,4 @@
+import 'exam_dates.dart';
 import '../reminders/reminder_ids.dart';
 import '../reminders/reminder_kind.dart';
 import 'calendar_event.dart';
@@ -36,13 +37,17 @@ class ExamReminderPlanner {
     ReminderIds.forTask('exam-hour:${event.id}', ReminderKind.start),
   ];
 
+  /// [registered] is what the user marked (course key → event id, see
+  /// ExamDates): the other dates of a marked exam get no reminder.
   static List<ExamReminder> forEvents(
     Iterable<CalendarEvent> events,
-    DateTime now,
-  ) {
+    DateTime now, {
+    Map<String, String> registered = const {},
+  }) {
+    final dates = ExamDates.of(events, registered);
     final plan = <ExamReminder>[];
     for (final e in events) {
-      if (e.kind != CalendarEventKind.exam) continue;
+      if (e.kind != CalendarEventKind.exam || dates.isPassedOver(e)) continue;
       final [dayId, hourId] = idsOf(e);
       final day = e.start.subtract(dayBefore);
       final hour = e.start.subtract(hourBefore);

@@ -30,7 +30,7 @@ class AssignmentSheet extends StatefulWidget {
 
   /// How its steps sit against the day's other blocks, when opened from
   /// the calendar.
-  final List<(String, bool)> clashes;
+  final List<String> clashes;
 
   const AssignmentSheet({
     super.key,
@@ -47,7 +47,7 @@ class AssignmentSheet extends StatefulWidget {
     required TaskRepository repository,
     required List<Destination> folders,
     required Future<void> Function() onChanged,
-    List<(String, bool)> clashes = const [],
+    List<String> clashes = const [],
   }) => showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,

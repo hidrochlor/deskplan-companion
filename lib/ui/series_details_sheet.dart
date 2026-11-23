@@ -23,7 +23,7 @@ class SeriesDetailsSheet extends StatefulWidget {
 
   /// How it sits against the day's other blocks, when opened from the
   /// calendar.
-  final List<(String, bool)> clashes;
+  final List<String> clashes;
 
   const SeriesDetailsSheet({
     super.key,
@@ -38,7 +38,7 @@ class SeriesDetailsSheet extends StatefulWidget {
     BuildContext context,
     TaskSeries series, {
     required Future<TaskSeries?> Function(Task occurrence) onToggle,
-    List<(String, bool)> clashes = const [],
+    List<String> clashes = const [],
   }) => showModalBottomSheet<SeriesAction>(
     context: context,
     showDragHandle: true,

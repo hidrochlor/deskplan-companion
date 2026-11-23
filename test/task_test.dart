@@ -51,4 +51,21 @@ void main() {
     final pcTime = DateTime.utc(2026, 11, 2, 10);
     expect(t.copyWith(done: true, updatedAt: pcTime).updatedAt, pcTime);
   });
+
+  test('moving forgets DeskPlan\'s course; other edits keep it', () {
+    final t = Task(
+      id: 'x',
+      title: 'DevFest',
+      parentId: 'all-day',
+      course: 'All Day',
+      courseKnown: true,
+      updatedAt: DateTime.utc(2026),
+    );
+    final kept = t.copyWith(title: 'DevFest Linz', parentId: 'all-day');
+    expect((kept.course, kept.courseKnown), ('All Day', true));
+    final moved = t.copyWith(parentId: 'events');
+    expect((moved.course, moved.courseKnown), (null, false));
+    final home = t.copyWith(clearParent: true);
+    expect((home.course, home.courseKnown), (null, false));
+  });
 }

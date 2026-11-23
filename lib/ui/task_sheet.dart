@@ -49,7 +49,7 @@ class TaskSheet extends StatefulWidget {
 
   /// How it sits against the day's other blocks, when opened from the
   /// calendar.
-  final List<(String, bool)> clashes;
+  final List<String> clashes;
 
   const TaskSheet({
     super.key,
@@ -72,7 +72,7 @@ class TaskSheet extends StatefulWidget {
     List<Destination> folders = const [],
     String? fixedParentId,
     String initialTitle = '',
-    List<(String, bool)> clashes = const [],
+    List<String> clashes = const [],
   }) => showModalBottomSheet<Object>(
     context: context,
     isScrollControlled: true,
