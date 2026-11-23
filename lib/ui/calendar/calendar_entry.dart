@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/repeats.dart';
 import '../../core/task.dart';
 import '../../core/task_tree.dart';
+import '../../core/time_relation.dart';
 import '../../features/calendar/calendar_event.dart';
 import '../../features/calendar/calendar_event_kind.dart';
 import '../course_names.dart';
@@ -32,6 +33,11 @@ class CalendarEntry {
   /// A coming occurrence of a repeating task, not stored yet.
   final bool projected;
 
+  /// For a step: its assignment's id and title, so a day's steps of one
+  /// assignment can be folded into one row.
+  final String? parentId;
+  final String? parentTitle;
+
   const CalendarEntry._({
     required this.title,
     required this.label,
@@ -42,6 +48,8 @@ class CalendarEntry {
     this.task,
     this.event,
     this.projected = false,
+    this.parentId,
+    this.parentTitle,
   });
 
   /// The PC's calendar colours (DESIGN.md, "Calendar colours"). The same in
@@ -81,7 +89,8 @@ class CalendarEntry {
       final end = t.end;
       if (t.isNote || end == null) continue;
       final course = courses.of(t);
-      final step = tree.isStep(t);
+      final parent = tree.parentOf(t);
+      final step = parent != null;
       final kind = t.isAssignment ? 'Assignment' : (step ? 'Step' : 'Task');
       final start = t.isAssignment ? null : t.start;
       // Old data may hold a start after its end: show it as a due time.
@@ -95,6 +104,8 @@ class CalendarEntry {
           isDue: !block,
           color: t.isAssignment ? assignmentColor : taskColor,
           task: t,
+          parentId: parent?.id,
+          parentTitle: parent?.title,
         ),
       );
     }
@@ -134,6 +145,32 @@ class CalendarEntry {
     final e = end.toLocal();
     if (s == e || isDue) return !s.isBefore(dayStart) && s.isBefore(next);
     return s.isBefore(next) && e.isAfter(dayStart);
+  }
+
+  /// Runs from a start to a later end (not a due time).
+  bool get isBlock => !isDue && start.isBefore(end);
+
+  /// Lines saying how this sits against the other blocks in [day]: "Ends
+  /// 15m into Lecture", "Starts right after Lab". Overlaps come first. Past
+  /// and finished entries are left out.
+  List<(String, bool)> relationsIn(List<CalendarEntry> day, DateTime now) {
+    if (!isBlock || dimmed(now)) return const [];
+    final out = <(String, bool)>[];
+    for (final other in day) {
+      if (identical(other, this) || !other.isBlock || other.dimmed(now)) {
+        continue;
+      }
+      final r = TimeRelation.of(
+        start,
+        end,
+        other.start,
+        other.end,
+        other.title,
+      );
+      if (r != null) out.add((r.text, r.overlaps));
+    }
+    out.sort((a, b) => (a.$2 == b.$2) ? 0 : (a.$2 ? -1 : 1));
+    return out;
   }
 
   /// Soonest first; on a tie the longer one first.

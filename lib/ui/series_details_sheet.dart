@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'clash_notice.dart';
+
 import '../core/repeats.dart';
 import '../core/task.dart';
 import 'date_text.dart';
@@ -19,10 +21,15 @@ class SeriesDetailsSheet extends StatefulWidget {
   /// (null when it is gone).
   final Future<TaskSeries?> Function(Task occurrence) onToggle;
 
+  /// How it sits against the day's other blocks, when opened from the
+  /// calendar.
+  final List<(String, bool)> clashes;
+
   const SeriesDetailsSheet({
     super.key,
     required this.series,
     required this.onToggle,
+    this.clashes = const [],
   });
 
   /// Answers [SeriesAction.edit] or [SeriesAction.delete] when the sheet was
@@ -31,11 +38,16 @@ class SeriesDetailsSheet extends StatefulWidget {
     BuildContext context,
     TaskSeries series, {
     required Future<TaskSeries?> Function(Task occurrence) onToggle,
+    List<(String, bool)> clashes = const [],
   }) => showModalBottomSheet<SeriesAction>(
     context: context,
     showDragHandle: true,
     isScrollControlled: true,
-    builder: (_) => SeriesDetailsSheet(series: series, onToggle: onToggle),
+    builder: (_) => SeriesDetailsSheet(
+      series: series,
+      onToggle: onToggle,
+      clashes: clashes,
+    ),
   );
 
   @override
@@ -164,6 +176,7 @@ class _SeriesDetailsSheetState extends State<SeriesDetailsSheet> {
                 ),
               ),
             ),
+            ClashNotice(lines: widget.clashes),
             if (rule != null)
               Padding(
                 padding: const EdgeInsets.only(top: 6),

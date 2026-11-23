@@ -457,7 +457,11 @@ class _TaskListScreenState extends State<TaskListScreen>
 
   /// Opens the sheet to add a task or assignment, or to edit [task]. An
   /// assignment opens its own sheet, with its steps.
-  Future<void> _open([Task? task, TaskKind kind = TaskKind.task]) async {
+  Future<void> _open([
+    Task? task,
+    TaskKind kind = TaskKind.task,
+    List<(String, bool)> clashes = const [],
+  ]) async {
     if (task != null && task.isNote) return _openNote(task);
     if (task != null && task.isAssignment) {
       await AssignmentSheet.show(
@@ -466,6 +470,7 @@ class _TaskListScreenState extends State<TaskListScreen>
         repository: _storage,
         folders: _folders,
         onChanged: _changed,
+        clashes: clashes,
       );
       return;
     }
@@ -474,6 +479,7 @@ class _TaskListScreenState extends State<TaskListScreen>
       task: task,
       kind: kind,
       folders: _folders,
+      clashes: clashes,
     );
     if (result is Task) {
       await _storage.save(result);
@@ -487,10 +493,14 @@ class _TaskListScreenState extends State<TaskListScreen>
 
   /// A repeating task's details: its timeline, a pen to edit it and a way
   /// to delete it whole.
-  Future<void> _openSeries(TaskSeries series) async {
+  Future<void> _openSeries(
+    TaskSeries series, [
+    List<(String, bool)> clashes = const [],
+  ]) async {
     final action = await SeriesDetailsSheet.show(
       context,
       series,
+      clashes: clashes,
       onToggle: (t) async {
         await _storage.save(t.copyWith(done: !t.done));
         await _changed();
@@ -830,14 +840,20 @@ class _TaskListScreenState extends State<TaskListScreen>
 
   /// A step opens its assignment, with its steps, as in the lists; an
   /// occurrence of a repeating task opens its series.
-  Future<void> _openFromCalendar(Task t) async {
+  /// [clashes] say how it sits against the day's other blocks.
+  Future<void> _openFromCalendar(
+    Task t, [
+    List<(String, bool)> clashes = const [],
+  ]) async {
     final series = _series.where((s) => s.contains(t.id)).firstOrNull;
-    if (series != null) return _openSeries(series);
+    if (series != null) return _openSeries(series, clashes);
     if (_tree.isStep(t)) {
       final holder = _tree.listed.where((a) => a.id == t.parentId);
-      if (holder.isNotEmpty) return _open(holder.first);
+      if (holder.isNotEmpty) {
+        return _open(holder.first, TaskKind.task, clashes);
+      }
     }
-    return _open(t);
+    return _open(t, TaskKind.task, clashes);
   }
 
   /// Notes while DeskPlan does not sync them: say why there are none.

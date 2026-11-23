@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../features/notes/note_block.dart';
 import '../../features/notes/note_format.dart';
+import '../../features/notes/auto_capitalize.dart';
 import '../theme/deskplan_colors.dart';
 import 'editor_line.dart';
 
@@ -104,6 +105,7 @@ class NoteLineView extends StatelessWidget {
       maxLines: null,
       keyboardType: TextInputType.multiline,
       textCapitalization: TextCapitalization.sentences,
+      inputFormatters: const [AutoCapitalizeFormatter()],
       style: _style(c),
       cursorColor: c.accent,
       decoration: bare(

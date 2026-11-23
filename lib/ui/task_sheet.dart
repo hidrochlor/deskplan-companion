@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'clash_notice.dart';
 import 'package:flutter/services.dart';
 
 import '../core/repeat_rule.dart';
@@ -45,6 +47,10 @@ class TaskSheet extends StatefulWidget {
   /// assignment's "Add a step" box).
   final String initialTitle;
 
+  /// How it sits against the day's other blocks, when opened from the
+  /// calendar.
+  final List<(String, bool)> clashes;
+
   const TaskSheet({
     super.key,
     this.task,
@@ -52,6 +58,7 @@ class TaskSheet extends StatefulWidget {
     this.folders = const [],
     this.fixedParentId,
     this.initialTitle = '',
+    this.clashes = const [],
   });
 
   /// Returned in place of a Task when the user taps Delete.
@@ -65,6 +72,7 @@ class TaskSheet extends StatefulWidget {
     List<Destination> folders = const [],
     String? fixedParentId,
     String initialTitle = '',
+    List<(String, bool)> clashes = const [],
   }) => showModalBottomSheet<Object>(
     context: context,
     isScrollControlled: true,
@@ -75,6 +83,7 @@ class TaskSheet extends StatefulWidget {
       folders: folders,
       fixedParentId: fixedParentId,
       initialTitle: initialTitle,
+      clashes: clashes,
     ),
   );
 
@@ -367,6 +376,7 @@ class _TaskSheetState extends State<TaskSheet> {
                       ),
                   ],
                 ),
+                ClashNotice(lines: widget.clashes),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _title,

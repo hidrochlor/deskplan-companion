@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../clash_notice.dart';
+
 import '../../features/calendar/calendar_event.dart';
 import '../../features/calendar/calendar_event_kind.dart';
 import '../date_text.dart';
@@ -17,16 +19,26 @@ class EventDetailsSheet extends StatelessWidget {
   /// that button (the sheet is opened from the course timetable itself).
   final List<CalendarEvent>? all;
 
-  const EventDetailsSheet({super.key, required this.event, this.all});
+  /// How it sits against the day's other blocks, when opened from the
+  /// calendar.
+  final List<(String, bool)> clashes;
+
+  const EventDetailsSheet({
+    super.key,
+    required this.event,
+    this.all,
+    this.clashes = const [],
+  });
 
   static Future<void> show(
     BuildContext context,
     CalendarEvent event, {
     List<CalendarEvent>? all,
+    List<(String, bool)> clashes = const [],
   }) => showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
-    builder: (_) => EventDetailsSheet(event: event, all: all),
+    builder: (_) => EventDetailsSheet(event: event, all: all, clashes: clashes),
   );
 
   @override
@@ -103,6 +115,7 @@ class EventDetailsSheet extends StatelessWidget {
             ),
             if (event.context.isNotEmpty)
               line(Icons.info_outline, event.context),
+            ClashNotice(lines: clashes),
             if (course != null && course.sessions.isNotEmpty) ...[
               const SizedBox(height: 14),
               SizedBox(

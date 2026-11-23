@@ -16,6 +16,9 @@ class TaskTree {
       task.parentId != null &&
       _byId[task.parentId]?.kind == TaskKind.assignment;
 
+  /// The assignment [task] is a step of, or null.
+  Task? parentOf(Task task) => isStep(task) ? _byId[task.parentId] : null;
+
   /// What the main list shows: everything that is not a step. Steps are
   /// shown inside their assignment.
   List<Task> get listed => _all.where((t) => !isStep(t)).toList();

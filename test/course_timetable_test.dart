@@ -122,7 +122,7 @@ void main() {
           body: CalendarView(
             entries: _events.map(CalendarEntry.ofEvent).toList(),
             asOf: _now,
-            onOpenTask: (_) {},
+            onOpenTask: (_, _) {},
             onRefresh: () async {},
             now: () => _now,
           ),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'clash_notice.dart';
+
 import '../core/task.dart';
 import '../core/task_remover.dart';
 import '../core/task_repository.dart';
@@ -26,12 +28,17 @@ class AssignmentSheet extends StatefulWidget {
   /// Called after every change, so the list behind updates and a sync starts.
   final Future<void> Function() onChanged;
 
+  /// How its steps sit against the day's other blocks, when opened from
+  /// the calendar.
+  final List<(String, bool)> clashes;
+
   const AssignmentSheet({
     super.key,
     required this.assignmentId,
     required this.repository,
     required this.folders,
     required this.onChanged,
+    this.clashes = const [],
   });
 
   static Future<void> show(
@@ -40,6 +47,7 @@ class AssignmentSheet extends StatefulWidget {
     required TaskRepository repository,
     required List<Destination> folders,
     required Future<void> Function() onChanged,
+    List<(String, bool)> clashes = const [],
   }) => showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -49,6 +57,7 @@ class AssignmentSheet extends StatefulWidget {
       repository: repository,
       folders: folders,
       onChanged: onChanged,
+      clashes: clashes,
     ),
   );
 
@@ -264,6 +273,7 @@ class _AssignmentSheetState extends State<AssignmentSheet> {
                 'Created ${DateText.when(context, assignment.createdAt)}',
                 style: TextStyle(fontSize: 12.5, color: c.faint),
               ),
+              ClashNotice(lines: widget.clashes),
               if (assignment.details.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 Text(assignment.details, style: TextStyle(color: c.text)),

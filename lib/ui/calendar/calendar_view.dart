@@ -8,6 +8,7 @@ import 'calendar_entry.dart';
 import 'calendar_entry_row.dart';
 import 'event_details_sheet.dart';
 import 'month_grid.dart';
+import 'step_group_row.dart';
 
 /// How the calendar is laid out.
 enum CalendarMode { month, agenda }
@@ -23,7 +24,10 @@ class CalendarView extends StatefulWidget {
   /// When DeskPlan built the cached events ("Timetable as of ..."), or null
   /// when none have been fetched yet.
   final DateTime? asOf;
-  final ValueChanged<Task> onOpenTask;
+
+  /// Opens the phone's item, with how it sits against the day's other
+  /// blocks (text, overlaps) to show at the top of its sheet.
+  final void Function(Task task, List<(String, bool)> clashes) onOpenTask;
   final Future<void> Function() onRefresh;
 
   /// What the pill says while a pull-down sync runs.
@@ -51,6 +55,9 @@ class _CalendarViewState extends State<CalendarView> {
   late DateTime _month;
   late DateTime _selected;
 
+  /// Unfolded step groups, by day and assignment id. Folded by default.
+  final _open = <String>{};
+
   @override
   void initState() {
     super.initState();
@@ -68,19 +75,24 @@ class _CalendarViewState extends State<CalendarView> {
       widget.entries.where((e) => e.isOn(day)).toList()
         ..sort(CalendarEntry.compare);
 
-  void _open(CalendarEntry e) {
+  void _openEntry(CalendarEntry e, List<(String, bool)> clashes) {
     final event = e.event;
     if (event != null) {
       EventDetailsSheet.show(
         context,
         event,
+        clashes: clashes,
         all: [
           for (final x in widget.entries)
             if (x.event != null) x.event!,
         ],
       );
     } else {
-      widget.onOpenTask(e.task!);
+      // A step opens its assignment: say which step each line is about.
+      widget.onOpenTask(e.task!, [
+        for (final (text, overlaps) in clashes)
+          (e.parentId == null ? text : '${e.title}: $text', overlaps),
+      ]);
     }
   }
 
@@ -192,12 +204,55 @@ class _CalendarViewState extends State<CalendarView> {
     );
   }
 
+  /// The day's rows. Two or more steps of one assignment fold into one
+  /// row ("4 steps · Essay"); tap it to show them.
   List<Widget> _rows(DateTime day, List<CalendarEntry> entries) {
     final now = widget.now();
-    return [
-      for (final e in entries)
-        CalendarEntryRow(entry: e, day: day, now: now, onTap: () => _open(e)),
-    ];
+    final stepsOf = <String, List<CalendarEntry>>{};
+    for (final e in entries) {
+      if (e.parentId case final id?) (stepsOf[id] ??= []).add(e);
+    }
+    Widget row(CalendarEntry e, {bool nested = false}) {
+      final relations = e.relationsIn(entries, now);
+      return CalendarEntryRow(
+        entry: e,
+        day: day,
+        now: now,
+        nested: nested,
+        relations: relations,
+        onTap: () => _openEntry(e, relations),
+      );
+    }
+
+    final shown = <String>{};
+    final out = <Widget>[];
+    for (final e in entries) {
+      final id = e.parentId;
+      final group = id == null ? null : stepsOf[id]!;
+      if (group == null || group.length < 2) {
+        out.add(row(e));
+        continue;
+      }
+      if (!shown.add(id!)) continue;
+      final key = '${day.toIso8601String()}|$id';
+      final isOpen = _open.contains(key);
+      out.add(
+        StepGroupRow(
+          steps: group,
+          title: e.parentTitle ?? 'Assignment',
+          day: day,
+          now: now,
+          open: isOpen,
+          clashes: group.any(
+            (s) => s.relationsIn(entries, now).any((r) => r.$2),
+          ),
+          onTap: () =>
+              setState(() => isOpen ? _open.remove(key) : _open.add(key)),
+        ),
+      );
+      if (isOpen) out.addAll(group.map((s) => row(s, nested: true)));
+    }
+    return out;
   }
 
   Widget _monthHeader() {

@@ -45,7 +45,7 @@ Future<List<Task>> _pump(
         body: CalendarView(
           entries: entries,
           asOf: asOf,
-          onOpenTask: opened.add,
+          onOpenTask: (t, _) => opened.add(t),
           onRefresh: () async {},
           now: () => _now,
         ),

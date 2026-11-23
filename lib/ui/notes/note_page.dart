@@ -8,6 +8,7 @@ import '../../core/task_repository.dart';
 import '../../features/notes/json_equality.dart';
 import '../../features/notes/note_autosaver.dart';
 import '../../features/notes/note_format.dart';
+import '../../features/notes/auto_capitalize.dart';
 import '../../features/queue/sync_report.dart';
 import '../../features/upload/https_task_uploader.dart';
 import '../theme/deskplan_colors.dart';
@@ -215,7 +216,10 @@ class _NotePageState extends State<NotePage> {
           autofocus: widget.note == null,
           textCapitalization: TextCapitalization.sentences,
           // DeskPlan refuses titles over 500 characters (protocol.md).
-          inputFormatters: [LengthLimitingTextInputFormatter(500)],
+          inputFormatters: [
+            LengthLimitingTextInputFormatter(500),
+            const AutoCapitalizeFormatter(),
+          ],
           textInputAction: TextInputAction.next,
           style: TextStyle(
             fontSize: 22,

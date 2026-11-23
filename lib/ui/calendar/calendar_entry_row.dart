@@ -15,12 +15,21 @@ class CalendarEntryRow extends StatelessWidget {
   final DateTime now;
   final VoidCallback onTap;
 
+  /// How it sits against the day's other blocks: (text, overlaps). An
+  /// overlap is shown in the warning colour.
+  final List<(String, bool)> relations;
+
+  /// Indented, as a step inside an unfolded assignment group.
+  final bool nested;
+
   const CalendarEntryRow({
     super.key,
     required this.entry,
     required this.day,
     required this.now,
     required this.onTap,
+    this.relations = const [],
+    this.nested = false,
   });
 
   String _time(BuildContext context) {
@@ -46,11 +55,12 @@ class CalendarEntryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = DeskPlanColors.of(context);
     final dim = entry.dimmed(now);
+    final clash = relations.any((r) => r.$2);
     final done = !entry.projected && (entry.task?.done ?? false);
     return Opacity(
       opacity: dim ? 0.5 : 1,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+        padding: EdgeInsets.fromLTRB(nested ? 28 : 12, 3, 12, 3),
         child: Material(
           color: c.surface,
           borderRadius: BorderRadius.circular(10),
@@ -110,6 +120,21 @@ class CalendarEntryRow extends StatelessWidget {
                       ),
                     ),
                   ),
+                  // A clash (or something right after): open it to see what.
+                  if (relations.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: Icon(
+                        clash
+                            ? Icons.warning_amber_rounded
+                            : Icons.arrow_forward_rounded,
+                        size: 16,
+                        color: clash ? c.warn : c.faint,
+                        semanticLabel: clash
+                            ? 'Overlaps something'
+                            : 'Something right after',
+                      ),
+                    ),
                   // A repeating task, on its stored days and the ones to come.
                   if (entry.task?.repeat != null)
                     Padding(
